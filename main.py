@@ -6,8 +6,8 @@ from io import BytesIO
 from datetime import datetime, timedelta
 
 # ---------- CONFIG ----------
-DISCORD_TOKEN = "TON_DISCORD_TOKEN"
-BATTLEMETRICS_TOKEN = "TON_TOKEN_BATTLEMETRICS"
+DISCORD_TOKEN = "MTQ4NTg2MjQyODE2MzA0NzU1Nw.GU129Q.IxUZPDuZJMe6XbTLRgp_BjzoopaX4wO5NcnJtA"
+BATTLEMETRICS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbiI6ImE5ZDc4OTViMDQ2MGY0ODIiLCJpYXQiOjE3NzQ0MDkxMTgsIm5iZiI6MTc3NDQwOTExOCwiaXNzIjoiaHR0cHM6Ly93d3cuYmF0dGxlbWV0cmljcy5jb20iLCJzdWIiOiJ1cm46dXNlcjoxMTczMjAyIn0.zIKGIeVhpFme6ch2n6cqBQWo1aIMh1WuFWC-hPu23d4"
 TRACK_CHANNEL_ID = 123456789012345678  # ID du salon Discord pour notifications
 
 intents = discord.Intents.default()
