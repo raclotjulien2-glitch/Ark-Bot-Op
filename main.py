@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 import aiohttp
 import asyncio
 import matplotlib.pyplot as plt
@@ -11,15 +11,13 @@ import os
 # ---------- CONFIG VIA ENV ----------
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 BATTLEMETRICS_TOKEN = os.environ.get("BATTLEMETRICS_TOKEN")
-TRACK_CHANNEL_ID = int(os.environ.get("TRACK_CHANNEL_ID"))
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 # ---------- STOCKAGE ----------
-tracked_players = {}  # {player_name: {"online": bool, "server": server_id}}
-pop_history = {}      # {server_id: [(timestamp, player_count)]}
+pop_history = {}  # {server_id: [(timestamp, player_count)]}
 
 # ---------- UTILITAIRES ASYNC ----------
 async def get_json(url, session, timeout=5):
@@ -135,12 +133,6 @@ async def graph(ctx, server_id: str):
     plt.close()
     await ctx.send(file=discord.File(buf, filename=f"graph_{server_id}.png"))
 
-# ---------- /track ----------
-@bot.command()
-async def track(ctx, player_name: str, server_id: str):
-    tracked_players[player_name.lower()] = {"online": False, "server": server_id}
-    await ctx.send(f"✅ Tracking activé pour **{player_name}** sur le serveur {server_id}")
-
 # ---------- /recon ----------
 @bot.command()
 async def recon(ctx, player_id: str):
@@ -174,28 +166,9 @@ async def recon(ctx, player_id: str):
                 embed.add_field(name="...", value=f"et {len(servers_info)-10} autres serveurs", inline=False)
         await ctx.send(embed=embed)
 
-# ---------- TÂCHE DE SUIVI ----------
-@tasks.loop(seconds=60)
-async def track_loop():
-    if not tracked_players:
-        return
-    channel = bot.get_channel(TRACK_CHANNEL_ID)
-    async with aiohttp.ClientSession() as session:
-        for player_name, info in tracked_players.items():
-            server_id = info["server"]
-            players = await get_server_players(server_id, session)
-            found_online = any(p["name"].lower()==player_name for p in players)
-            if info["online"] and not found_online:
-                await channel.send(f"🔴 **{player_name}** s'est déconnecté du serveur {server_id}")
-            elif not info["online"] and found_online:
-                p_platform = next(p["platform"] for p in players if p["name"].lower()==player_name)
-                await channel.send(f"🟢 **{player_name}** s'est connecté sur le serveur {server_id} ({p_platform})")
-            tracked_players[player_name]["online"]=found_online
-
 # ---------- DÉMARRAGE ----------
 @bot.event
 async def on_ready():
     print(f"Connecté en tant que {bot.user}")
-    track_loop.start()
 
 bot.run(DISCORD_TOKEN)
