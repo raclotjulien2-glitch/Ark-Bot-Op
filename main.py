@@ -6,11 +6,12 @@ import matplotlib.pyplot as plt
 from io import BytesIO
 from datetime import datetime, timedelta
 import math
+import os
 
-# ---------- CONFIG ----------
-DISCORD_TOKEN = "TON_DISCORD_TOKEN"
-BATTLEMETRICS_TOKEN = "TON_TOKEN_BATTLEMETRICS"
-TRACK_CHANNEL_ID = 123456789012345678  # ID du salon Discord pour notifications
+# ---------- CONFIG VIA VARIABLES D'ENVIRONNEMENT ----------
+DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
+BATTLEMETRICS_TOKEN = os.environ.get("BATTLEMETRICS_TOKEN")
+TRACK_CHANNEL_ID = int(os.environ.get("TRACK_CHANNEL_ID"))
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -47,7 +48,7 @@ async def get_server_players(server_id, session):
                             "platform": p["attributes"].get("platform", "N/A")})
     return players
 
-# ---------- COMMANDE /pop ----------
+# ---------- /pop ----------
 @bot.command()
 async def pop(ctx, server_id: str):
     async with aiohttp.ClientSession() as session:
@@ -68,7 +69,7 @@ async def pop(ctx, server_id: str):
 
         players_list = await get_server_players(server_id, session)
 
-        # Pagination embed si >20 joueurs
+        # Pagination si +20 joueurs
         page_size = 20
         total_pages = math.ceil(len(players_list)/page_size)
         current_page = 0
@@ -89,7 +90,6 @@ async def pop(ctx, server_id: str):
         if total_pages <=1:
             return
 
-        # Ajouter réactions pour naviguer
         await message.add_reaction("◀️")
         await message.add_reaction("▶️")
 
@@ -109,13 +109,12 @@ async def pop(ctx, server_id: str):
             except asyncio.TimeoutError:
                 break
 
-# ---------- COMMANDE /graph ----------
+# ---------- /graph ----------
 @bot.command()
 async def graph(ctx, server_id: str):
     if server_id not in pop_history or not pop_history[server_id]:
         await ctx.send("❌ Pas assez de données pour ce serveur.")
         return
-
     times, counts = zip(*pop_history[server_id])
     max_pop = max(counts)+1
     plt.style.use('seaborn-darkgrid')
@@ -128,20 +127,19 @@ async def graph(ctx, server_id: str):
     plt.xticks(rotation=45)
     plt.grid(True, linestyle='--', alpha=0.5)
     plt.tight_layout()
-
     buf = BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
     plt.close()
     await ctx.send(file=discord.File(buf, filename=f"graph_{server_id}.png"))
 
-# ---------- COMMANDE /track ----------
+# ---------- /track ----------
 @bot.command()
 async def track(ctx, player_name: str, server_id: str):
     tracked_players[player_name.lower()] = {"online": False, "server": server_id}
     await ctx.send(f"✅ Tracking activé pour **{player_name}** sur le serveur {server_id}")
 
-# ---------- COMMANDE /recon ----------
+# ---------- /recon ----------
 @bot.command()
 async def recon(ctx, player_id: str):
     async with aiohttp.ClientSession() as session:
