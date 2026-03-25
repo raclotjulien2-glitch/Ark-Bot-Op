@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import math
 import os
 
-# ---------- CONFIG VIA VARIABLES D'ENVIRONNEMENT ----------
+# ---------- CONFIG VIA ENV ----------
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 BATTLEMETRICS_TOKEN = os.environ.get("BATTLEMETRICS_TOKEN")
 TRACK_CHANNEL_ID = int(os.environ.get("TRACK_CHANNEL_ID"))
@@ -18,11 +18,11 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 # ---------- STOCKAGE ----------
-tracked_players = {}   # { "pseudo": {"online": bool, "server": server_id} }
-pop_history = {}       # { server_id: [(timestamp, player_count), ...] }
+tracked_players = {}  # {player_name: {"online": bool, "server": server_id}}
+pop_history = {}      # {server_id: [(timestamp, player_count)]}
 
 # ---------- UTILITAIRES ASYNC ----------
-async def get_json(url, session, timeout=10):
+async def get_json(url, session, timeout=5):
     try:
         async with session.get(url, headers={"Authorization": f"Bearer {BATTLEMETRICS_TOKEN}"}, timeout=timeout) as resp:
             if resp.status != 200:
@@ -35,7 +35,7 @@ async def get_json(url, session, timeout=10):
 
 async def get_server_data(server_id, session):
     data = await get_json(f"https://api.battlemetrics.com/servers/{server_id}", session)
-    if data:
+    if data and "data" in data:
         return data["data"]["attributes"]
     return None
 
@@ -44,8 +44,10 @@ async def get_server_players(server_id, session):
     players = []
     if data and "data" in data:
         for p in data["data"]:
-            players.append({"name": p["attributes"].get("name", "Inconnu"),
-                            "platform": p["attributes"].get("platform", "N/A")})
+            players.append({
+                "name": p["attributes"].get("name", "Inconnu"),
+                "platform": p["attributes"].get("platform", "N/A")
+            })
     return players
 
 # ---------- /pop ----------
@@ -65,11 +67,11 @@ async def pop(ctx, server_id: str):
         if server_id not in pop_history:
             pop_history[server_id] = []
         pop_history[server_id].append((datetime.utcnow(), player_count))
-        pop_history[server_id] = [(t,p) for t,p in pop_history[server_id] if t > datetime.utcnow() - timedelta(hours=24)]
+        pop_history[server_id] = [(t, p) for t, p in pop_history[server_id] if t > datetime.utcnow() - timedelta(hours=24)]
 
         players_list = await get_server_players(server_id, session)
 
-        # Pagination si +20 joueurs
+        # Pagination si >20 joueurs
         page_size = 20
         total_pages = math.ceil(len(players_list)/page_size)
         current_page = 0
@@ -87,7 +89,7 @@ async def pop(ctx, server_id: str):
             return embed
 
         message = await ctx.send(embed=create_embed(current_page))
-        if total_pages <=1:
+        if total_pages <= 1:
             return
 
         await message.add_reaction("◀️")
@@ -100,10 +102,10 @@ async def pop(ctx, server_id: str):
             try:
                 reaction, user = await bot.wait_for('reaction_add', timeout=60.0, check=check)
                 if str(reaction.emoji) == "▶️" and current_page+1 < total_pages:
-                    current_page +=1
+                    current_page += 1
                     await message.edit(embed=create_embed(current_page))
-                elif str(reaction.emoji) == "◀️" and current_page >0:
-                    current_page -=1
+                elif str(reaction.emoji) == "◀️" and current_page > 0:
+                    current_page -= 1
                     await message.edit(embed=create_embed(current_page))
                 await message.remove_reaction(reaction, user)
             except asyncio.TimeoutError:
@@ -162,7 +164,6 @@ async def recon(ctx, player_id: str):
                 servers_info.append(f"{srv_name} ({srv_id}) – {hours_played}h")
                 if attributes.get("status")=="online" and attributes.get("server")==srv_id:
                     current_server=f"{srv_name} ({srv_id})"
-
         embed = discord.Embed(title=f"🔎 Recon joueur : {player_name}", color=0x00ff99)
         embed.add_field(name="Plateforme", value=platform, inline=True)
         embed.add_field(name="Statut", value=status, inline=True)
